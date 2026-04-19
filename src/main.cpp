@@ -1,5 +1,4 @@
 #include "../include/gate_mind.hpp"
-#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 #include <iterator>
