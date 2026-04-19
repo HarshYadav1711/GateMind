@@ -34,8 +34,10 @@ bool expect(GateInputs const& in, GateDecision want, std::size_t row_index) {
   if (got == want) {
     return true;
   }
-  std::cerr << "FAIL at row " << row_index << " - expected " << decision_name(want) << ", got "
-            << decision_name(got) << '\n';
+  std::cerr << "FAIL row " << row_index << " (alarm=" << (in.alarm_active ? "on" : "off")
+            << " trusted=" << (in.guard_trusted ? "yes" : "no")
+            << " locks_verified=" << (in.door_locks_verified ? "yes" : "no") << ")"
+            << " - expected " << decision_name(want) << ", got " << decision_name(got) << '\n';
   return false;
 }
 
@@ -76,7 +78,7 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  std::cout << "Self-check: all 8 input combinations match the decision table.\n\n";
+  std::cout << "Self-check passed: all 8 combinations match the decision table.\n\n";
 
   print_scenario("1. Routine egress", GateInputs{false, true, true});
   print_scenario("2. Alarm on, safe-exit path not verified", GateInputs{true, true, false});
