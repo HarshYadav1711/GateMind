@@ -2,14 +2,14 @@
 
 ## Problem summary
 
-Pick one of three doors: **safe exit**, **trap**, or **starting point**, from three boolean inputs. The rules need to be obvious, total (every input combination maps somewhere), and conservative when sensors disagree.
+Choose among **safe exit**, **trap**, or **starting point** using three boolean inputs. Rules stay explicit and complete (every combination maps somewhere), and conservative when sensors disagree.
 
 ## Inputs
 
 | Field | Meaning |
 |--------|--------|
 | `alarm_active` | Facility alarm is on. |
-| `guard_trusted` | Identity / session checks out. |
+| `guard_trusted` | Session identity checks out. |
 | `door_locks_verified` | Safe-exit path reports OK from lock hardware. |
 
 ## Rules (order matters)
@@ -22,12 +22,12 @@ Pick one of three doors: **safe exit**, **trap**, or **starting point**, from th
    **Safe exit**.
 
 3. **Alarm off, not trusted, locks bad**  
-   **Trap** (single clear “bad” case when the building is otherwise quiet).
+   **Trap** (the one unambiguous bad case when the facility is quiet).
 
 4. **Everything else**  
-   **Starting point** (mixed or weak signals).
+   **Starting point** (mixed or inconclusive signals).
 
-Trap is intentionally narrow: with no alarm, sending someone to the trap is reserved for **untrusted session and failed locks at the same time**—the least ambiguous “bad” pairing. If only one of those is wrong, or the two disagree, we default to **starting point** so we are not punishing noisy or conflicting telemetry.
+Trap stays narrow: with no alarm, it is only for **untrusted session and failed locks together**—the clearest bad pairing. If only one fails, or the two disagree, route to **starting point** so noisy or conflicting telemetry does not land someone in the trap.
 
 Safe exit always requires **verified locks**. Trust can be ignored for evacuation only when the alarm is on **and** locks verify.
 
@@ -46,7 +46,7 @@ Safe exit always requires **verified locks**. Trust can be ignored for evacuatio
 | off | no | yes | Start |
 | off | no | no | Trap |
 
-## Edge cases worth stating
+## Edge cases
 
 - **Alarm + good locks:** Evacuation wins even if the session is untrusted.  
 - **Alarm + bad locks:** No safe-exit label; **start**.  
@@ -55,7 +55,7 @@ Safe exit always requires **verified locks**. Trust can be ignored for evacuatio
 
 ## Why this holds up
 
-The core is one function with no hidden state. The program checks all eight input combinations against the table in `main`; if the logic and the table drift, the self-check fails. That is the whole reliability story: small surface area, explicit table, fail loud.
+The core is one function with no hidden state. `main` checks all eight combinations against the table; if logic and table drift, the self-check fails. Reliability here is small surface area, an explicit table, and a loud failure when they disagree.
 
 ## How to run
 
@@ -64,10 +64,10 @@ g++ -std=c++17 -Wall -Wextra -pedantic src/main.cpp src/gate_mind.cpp -o gatemin
 ./gatemind
 ```
 
-You should see a one-line self-check, then three sample scenarios. Exit code `0` means the table check passed; non-zero means it did not.
+Expect a short self-check line, then three sample scenarios. Exit code `0` means the table check passed; non-zero means it did not.
 
 ## How I approached this
 
-I wrote the truth table before polishing prose. Once the eight rows were stable, the code almost wrote itself: alarm branch first, then the quiet “happy path,” then one explicit trap case, then **start** for the remaining rows. The explanation strings follow that same order so a reviewer can read `decide_gate` and `explain_decision` side by side without hunting for mismatches.
+I fixed the truth table first, then tightened the prose. Once the eight rows held, the code structure was straightforward: alarm branch, then the quiet “happy path,” then one explicit trap case, then **start** for what is left. Explanation strings follow that order so `decide_gate` and `explain_decision` stay easy to compare.
 
-The redundant “scenario” tests were dropped in favor of the full table only—same coverage, less noise. If this were production code, the next step would be feeding real sensor enums instead of three booleans, but the structure would stay the same.
+Extra scenario tests were dropped in favor of the full table—same coverage, less noise. In a production system, the next step would be richer sensor types instead of three booleans; the branching shape would stay the same.
