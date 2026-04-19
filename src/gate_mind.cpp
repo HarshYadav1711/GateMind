@@ -1,7 +1,6 @@
 #include "gate_mind.hpp"
 
 GateDecision decide_gate(GateInputs const& in) {
-  // Alarm overrides normal routing: evacuate only if the safe-exit path is provably sound.
   if (in.alarm_active) {
     if (in.door_locks_verified) {
       return GateDecision::SAFE_EXIT;
@@ -13,7 +12,6 @@ GateDecision decide_gate(GateInputs const& in) {
     return GateDecision::SAFE_EXIT;
   }
 
-  // Clear hostile + tamper signal when the facility is otherwise quiet.
   if (!in.guard_trusted && !in.door_locks_verified) {
     return GateDecision::TRAP;
   }
@@ -22,27 +20,25 @@ GateDecision decide_gate(GateInputs const& in) {
 }
 
 std::string explain_decision(GateInputs const& in) {
-  GateDecision const d = decide_gate(in);
-
-  if (d == GateDecision::SAFE_EXIT) {
-    if (in.alarm_active) {
-      return "Facility alarm is active and safe-exit locks are verified; evacuation takes priority.";
+  // Same order as decide_gate so the story matches the branch structure.
+  if (in.alarm_active) {
+    if (in.door_locks_verified) {
+      return "Alarm is on and the safe-exit path is verified: use the safe exit.";
     }
-    return "No alarm, guard session is trusted, and safe-exit locks verify; proceed to safe exit.";
+    return "Alarm is on but the safe-exit path is not verified: return to the starting point.";
   }
 
-  if (d == GateDecision::TRAP) {
-    return "No alarm, but the session is untrusted and safe-exit locks are not verified; isolate via trap.";
+  if (in.guard_trusted && in.door_locks_verified) {
+    return "No alarm, session is trusted, locks verify: safe exit.";
   }
 
-  if (in.alarm_active && !in.door_locks_verified) {
-    return "Alarm is active but safe-exit integrity is unclear; return to starting point.";
+  if (!in.guard_trusted && !in.door_locks_verified) {
+    return "No alarm, session not trusted, locks not verified: route to the trap.";
   }
+
   if (in.guard_trusted && !in.door_locks_verified) {
-    return "Guard is trusted but locks are not verified; unclear path, return to starting point.";
+    return "Session is trusted but locks are not verified: return to the starting point.";
   }
-  if (!in.guard_trusted && in.door_locks_verified) {
-    return "Locks verify but the guard session is not trusted; conflicting inputs, return to starting point.";
-  }
-  return "Inputs are unclear or conflicting; return to starting point.";
+
+  return "Locks verify but session is not trusted: conflicting inputs, return to the starting point.";
 }

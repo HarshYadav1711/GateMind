@@ -1,9 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 
-enum class GateDecision : std::uint8_t {
+enum class GateDecision {
   SAFE_EXIT,
   TRAP,
   START_POINT

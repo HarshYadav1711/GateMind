@@ -2,66 +2,70 @@
 
 ## Problem summary
 
-Three doors: **safe exit**, **trap**, and **starting point**. A small piece of logic has to pick one based on facility state—without guessing when the situation is ambiguous.
+Pick one of three doors: **safe exit**, **trap**, or **starting point**, from three boolean inputs. The rules need to be obvious, total (every input combination maps somewhere), and conservative when sensors disagree.
 
-## Approach
+## Inputs
 
-**Inputs** (all booleans):
+| Field | Meaning |
+|--------|--------|
+| `alarm_active` | Facility alarm is on. |
+| `guard_trusted` | Identity / session checks out. |
+| `door_locks_verified` | Safe-exit path reports OK from lock hardware. |
 
-| Input | Role |
-|--------|------|
-| `alarm_active` | Facility alarm (evacuation / safety context). |
-| `guard_trusted` | Session or guard identity checks out. |
-| `door_locks_verified` | Safe-exit path / locks report OK. |
+## Rules (order matters)
 
-**Priority**
+1. **Alarm on**  
+   If locks verify the safe-exit path, send **safe exit**.  
+   If not, **starting point** (do not guess a safe route during an alarm).
 
-1. **Alarm first.** If the alarm is on, we only send people toward **safe exit** when the safe-exit path is **verified**. If the alarm is on but locks are not verified, we do not invent a safe route—we send people back to **start**.
-2. **Quiet facility.** **Safe exit** only if both **trusted** and **locks verified**.
-3. **Trap** only in a narrow case: no alarm, **not** trusted, **and** locks not verified (clear tamper / unauthorized read).
-4. Anything else that is mixed or weak signals defaults to **starting point**.
+2. **Alarm off, trusted, locks OK**  
+   **Safe exit**.
 
-So: safety context can override normal trust rules for evacuation, but **never** without verified locks; ambiguity goes to **start**, except that one explicit quiet **trap** case.
+3. **Alarm off, not trusted, locks bad**  
+   **Trap** (single clear “bad” case when the building is otherwise quiet).
+
+4. **Everything else**  
+   **Starting point** (mixed or weak signals).
+
+Safe exit always requires **verified locks**. Trust can be ignored for evacuation only when the alarm is on **and** locks verify.
 
 ## Decision table
 
-Alarm **A**, trusted **T**, locks **L**. Outcomes: **EXIT** = safe exit, **START** = starting point, **TRAP** = trap.
+`A` = alarm, `T` = trusted, `L` = locks verified.
 
 | A | T | L | Outcome |
 |---|---|---|---------|
-| on | yes | yes | EXIT |
-| on | yes | no | START |
-| on | no | yes | EXIT |
-| on | no | no | START |
-| off | yes | yes | EXIT |
-| off | yes | no | START |
-| off | no | yes | START |
-| off | no | no | TRAP |
+| on | yes | yes | Safe exit |
+| on | yes | no | Start |
+| on | no | yes | Safe exit |
+| on | no | no | Start |
+| off | yes | yes | Safe exit |
+| off | yes | no | Start |
+| off | no | yes | Start |
+| off | no | no | Trap |
 
-## Edge cases
+## Edge cases worth stating
 
-- **Alarm + verified locks:** Evacuation wins even if the session is untrusted—the priority is getting out when the path is known good.
-- **Alarm + unverified locks:** We cannot label the path safe; **start** is the conservative choice.
-- **Trusted + bad locks (no alarm):** Trusted identity does not fix bad hardware telemetry; **start**.
-- **Untrusted + good locks (no alarm):** Trust and sensors disagree; **start**, not **trap** (trap needs both untrusted and bad locks when quiet).
+- **Alarm + good locks:** Evacuation wins even if the session is untrusted.  
+- **Alarm + bad locks:** No safe-exit label; **start**.  
+- **Quiet + trusted + bad locks:** Identity is not enough if locks fail; **start**.  
+- **Quiet + untrusted + good locks:** **Start**, not trap—trap needs both untrusted and bad locks when the alarm is off.
 
-## Why this is reliable
+## Why this holds up
 
-The function is a **total** mapping: every combination of the three booleans maps to exactly one door. There is no hidden state, no randomness, and no dependency on order of evaluation beyond the fixed rules above. The exhaustive check in `main` encodes the same table as the code—if someone changes one without the other, the program fails fast.
+The core is one function with no hidden state. The program checks all eight input combinations against the table in `main`; if the logic and the table drift, the self-check fails. That is the whole reliability story: small surface area, explicit table, fail loud.
 
 ## How to run
-
-From the project root (adjust paths if needed):
 
 ```bash
 g++ -std=c++17 -Wall -Wextra -pedantic src/main.cpp src/gate_mind.cpp -I include -o gatemind
 ./gatemind
 ```
 
-On success you’ll see `All checks passed`, then three sample scenarios. A non-zero exit code means a verification check failed.
+You should see a one-line self-check, then three sample scenarios. Exit code `0` means the table check passed; non-zero means it did not.
 
-## How I approached this problem
+## How I approached this
 
-I treated it as **policy clarity**, not algorithms. The hard part is naming the inputs so each flag has one job, then ordering rules so nothing contradicts itself in an interview walkthrough. I wanted **safe exit** to require **verified locks** in every case, and I wanted a single obvious **trap** condition so it does not feel arbitrary.
+I wrote the truth table before polishing prose. Once the eight rows were stable, the code almost wrote itself: alarm branch first, then the quiet “happy path,” then one explicit trap case, then **start** for the remaining rows. The explanation strings follow that same order so a reviewer can read `decide_gate` and `explain_decision` side by side without hunting for mismatches.
 
-The truth-table test is there because this kind of logic **will** get edited later; without a full 8-row check, it is easy to break one row and not notice. Writing the README table to match the code forces the same story in three places: implementation, tests, and explanation—which is exactly what you want when you record the video.
+The redundant “scenario” tests were dropped in favor of the full table only—same coverage, less noise. If this were production code, the next step would be feeding real sensor enums instead of three booleans, but the structure would stay the same.

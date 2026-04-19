@@ -4,51 +4,48 @@
 
 namespace {
 
-void print_scenario(char const* title, GateInputs const& in) {
-  std::cout << "--- " << title << " ---\n";
-  std::cout << "alarm=" << (in.alarm_active ? "on" : "off")
-            << "  trusted=" << (in.guard_trusted ? "yes" : "no")
-            << "  locks_verified=" << (in.door_locks_verified ? "yes" : "no")
-            << '\n';
-
-  GateDecision const d = decide_gate(in);
-  char const* name = nullptr;
+char const* decision_name(GateDecision d) {
   switch (d) {
   case GateDecision::SAFE_EXIT:
-    name = "SAFE_EXIT";
-    break;
+    return "SAFE_EXIT";
   case GateDecision::TRAP:
-    name = "TRAP";
-    break;
+    return "TRAP";
   case GateDecision::START_POINT:
-    name = "START_POINT";
-    break;
+    return "START_POINT";
+  default:
+    return "?";
   }
-
-  std::cout << "decision: " << name << '\n';
-  std::cout << explain_decision(in) << "\n\n";
 }
 
-bool check_case(GateInputs const& in, GateDecision expected, char const* label) {
+void print_scenario(char const* title, GateInputs const& in) {
+  std::cout << title << '\n';
+  std::cout << "  alarm=" << (in.alarm_active ? "on" : "off")
+            << "  trusted=" << (in.guard_trusted ? "yes" : "no")
+            << "  locks_verified=" << (in.door_locks_verified ? "yes" : "no") << '\n';
+
+  GateDecision const d = decide_gate(in);
+  std::cout << "  -> " << decision_name(d) << '\n';
+  std::cout << "  " << explain_decision(in) << "\n\n";
+}
+
+bool expect(GateInputs const& in, GateDecision want, unsigned row_index) {
   GateDecision const got = decide_gate(in);
-  if (got == expected) {
+  if (got == want) {
     return true;
   }
-  std::cerr << "[check failed] " << label << " (expected "
-            << static_cast<int>(expected) << ", got " << static_cast<int>(got) << ")\n";
+  std::cerr << "FAIL at row " << row_index << " - expected " << decision_name(want) << ", got "
+            << decision_name(got) << '\n';
   return false;
 }
 
-// Exhaustive 3-bit input space: proves the mapping is total and stable.
-bool verify_full_table() {
+bool run_truth_table() {
   struct Row {
     bool alarm;
     bool trusted;
     bool locks;
     GateDecision want;
   };
-  static Row const table[] = {
-      // alarm, trusted, locks
+  static Row const kTable[] = {
       {true, true, true, GateDecision::SAFE_EXIT},
       {true, true, false, GateDecision::START_POINT},
       {true, false, true, GateDecision::SAFE_EXIT},
@@ -59,55 +56,31 @@ bool verify_full_table() {
       {false, false, false, GateDecision::TRAP},
   };
 
+  constexpr auto kRows = sizeof(kTable) / sizeof(kTable[0]);
   bool ok = true;
-  for (auto const& row : table) {
-    GateInputs const in{row.alarm, row.trusted, row.locks};
-    if (!check_case(in, row.want, "truth table row")) {
+  for (unsigned i = 0; i < kRows; ++i) {
+    Row const& r = kTable[i];
+    GateInputs const in{r.alarm, r.trusted, r.locks};
+    if (!expect(in, r.want, i)) {
       ok = false;
     }
   }
   return ok;
 }
 
-bool verify_scenarios() {
-  bool ok = true;
-
-  ok &= check_case(GateInputs{false, true, true}, GateDecision::SAFE_EXIT,
-                   "safe exit: quiet, trusted, locks ok");
-
-  ok &= check_case(GateInputs{true, false, true}, GateDecision::SAFE_EXIT,
-                   "safe exit: alarm overrides trust when locks verify");
-
-  ok &= check_case(GateInputs{false, false, false}, GateDecision::TRAP,
-                   "trap: quiet, untrusted, locks bad");
-
-  ok &= check_case(GateInputs{false, true, false}, GateDecision::START_POINT,
-                   "fallback: trusted but locks unverified");
-
-  ok &= check_case(GateInputs{false, false, true}, GateDecision::START_POINT,
-                   "conflicting: locks ok but not trusted");
-
-  ok &= check_case(GateInputs{true, true, false}, GateDecision::START_POINT,
-                   "alarm but path not verified");
-
-  return ok;
-}
-
 }  // namespace
 
 int main() {
-  bool const table_ok = verify_full_table();
-  bool const scenario_ok = verify_scenarios();
-
-  if (!table_ok || !scenario_ok) {
-    std::cerr << "Verification failed.\n";
+  if (!run_truth_table()) {
+    std::cerr << "Self-check failed.\n";
     return EXIT_FAILURE;
   }
-  std::cout << "All checks passed (full table + scenarios).\n\n";
 
-  print_scenario("Routine egress", GateInputs{false, true, true});
-  print_scenario("Alarm on, exit path not verified", GateInputs{true, true, false});
-  print_scenario("Quiet facility, untrusted session and bad locks", GateInputs{false, false, false});
+  std::cout << "Self-check: all 8 input combinations match the decision table.\n\n";
+
+  print_scenario("1. Routine egress", GateInputs{false, true, true});
+  print_scenario("2. Alarm on, safe-exit path not verified", GateInputs{true, true, false});
+  print_scenario("3. Quiet site, untrusted session and bad locks", GateInputs{false, false, false});
 
   return EXIT_SUCCESS;
 }
