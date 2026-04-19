@@ -1,4 +1,4 @@
-#include "gate_mind.hpp"
+#include "../include/gate_mind.hpp"
 
 GateDecision decide_gate(GateInputs const& in) {
   if (in.alarm_active) {

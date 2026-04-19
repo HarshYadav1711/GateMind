@@ -58,7 +58,7 @@ The core is one function with no hidden state. The program checks all eight inpu
 ## How to run
 
 ```bash
-g++ -std=c++17 -Wall -Wextra -pedantic src/main.cpp src/gate_mind.cpp -I include -o gatemind
+g++ -std=c++17 -Wall -Wextra -pedantic src/main.cpp src/gate_mind.cpp -o gatemind
 ./gatemind
 ```
 

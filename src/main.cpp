@@ -1,6 +1,8 @@
-#include "gate_mind.hpp"
+#include "../include/gate_mind.hpp"
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 
 namespace {
 
@@ -28,7 +30,7 @@ void print_scenario(char const* title, GateInputs const& in) {
   std::cout << "  " << explain_decision(in) << "\n\n";
 }
 
-bool expect(GateInputs const& in, GateDecision want, unsigned row_index) {
+bool expect(GateInputs const& in, GateDecision want, std::size_t row_index) {
   GateDecision const got = decide_gate(in);
   if (got == want) {
     return true;
@@ -56,9 +58,8 @@ bool run_truth_table() {
       {false, false, false, GateDecision::TRAP},
   };
 
-  constexpr auto kRows = sizeof(kTable) / sizeof(kTable[0]);
   bool ok = true;
-  for (unsigned i = 0; i < kRows; ++i) {
+  for (std::size_t i = 0; i < std::size(kTable); ++i) {
     Row const& r = kTable[i];
     GateInputs const in{r.alarm, r.trusted, r.locks};
     if (!expect(in, r.want, i)) {
