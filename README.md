@@ -27,6 +27,8 @@ Pick one of three doors: **safe exit**, **trap**, or **starting point**, from th
 4. **Everything else**  
    **Starting point** (mixed or weak signals).
 
+Trap is intentionally narrow: with no alarm, sending someone to the trap is reserved for **untrusted session and failed locks at the same time**—the least ambiguous “bad” pairing. If only one of those is wrong, or the two disagree, we default to **starting point** so we are not punishing noisy or conflicting telemetry.
+
 Safe exit always requires **verified locks**. Trust can be ignored for evacuation only when the alarm is on **and** locks verify.
 
 ## Decision table

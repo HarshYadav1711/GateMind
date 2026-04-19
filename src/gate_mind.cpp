@@ -12,6 +12,7 @@ GateDecision decide_gate(GateInputs const& in) {
     return GateDecision::SAFE_EXIT;
   }
 
+  // Only trap when the alarm is off and both checks fail together (clear tamper). Any mixed signal uses start.
   if (!in.guard_trusted && !in.door_locks_verified) {
     return GateDecision::TRAP;
   }
